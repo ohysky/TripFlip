@@ -25,10 +25,9 @@ export const INTENSITY: Record<Intensity, { label: string; desc: string }> = {
 };
 
 export const BUDGET: Record<Budget, { label: string; desc: string }> = {
-  value: { label: "가성비", desc: "비용 우선" },
-  balanced: { label: "균형", desc: "비용과 만족 균형" },
-  comfort: { label: "여유", desc: "편의 우선" },
-  premium: { label: "프리미엄", desc: "경험 우선" },
+  value: { label: "가성비", desc: "최대한 싸게" },
+  balanced: { label: "가심비", desc: "적당한 가격 · 만족 우선" },
+  premium: { label: "프리미엄", desc: "가격보다 경험" },
 };
 
 export function triLabel(v: Tri, yes: string, no: string): string {

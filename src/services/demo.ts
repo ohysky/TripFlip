@@ -7,7 +7,6 @@ export const DEMO_CONDITIONS: TripConditions = {
   endDate: "2027-01-16",
   party: { adults: 4, children: 2, childAges: [4, 2] },
   budget: "balanced",
-  customBudget: null,
   intensity: "normal",
   prefs: ["relax", "sightseeing", "food", "kids"],
   stroller: true,

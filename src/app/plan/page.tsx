@@ -18,7 +18,7 @@ function PlanInner() {
     if (theme === "kids") return { ...base, party: base.party.children ? base.party : { ...base.party, children: 1, childAges: [4] }, prefs: Array.from(new Set([...base.prefs, "kids" as const])) };
     if (theme === "relax") return { ...base, intensity: "relaxed", prefs: Array.from(new Set([...base.prefs, "relax" as const])) };
     if (theme === "food") return { ...base, prefs: Array.from(new Set([...base.prefs, "food" as const])) };
-    if (theme === "value") return { ...base, budget: "value", customBudget: null };
+    if (theme === "value") return { ...base, budget: "value" };
     return base;
   }, [conditions, theme]);
 

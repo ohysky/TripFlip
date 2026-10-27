@@ -8,7 +8,7 @@ export type Tri = boolean | null;
 export type DataSource = "DEMO" | "USER" | "API";
 
 export type Intensity = "relaxed" | "normal" | "packed";
-export type Budget = "value" | "balanced" | "comfort" | "premium";
+export type Budget = "value" | "balanced" | "premium";
 export type Pref =
   | "sightseeing"
   | "nature"
@@ -34,7 +34,6 @@ export interface TripConditions {
   endDate: string;
   party: Party;
   budget: Budget;
-  customBudget: number | null; // 1인 기준 만원, 직접 입력 시
   intensity: Intensity;
   prefs: Pref[];
   stroller: boolean;

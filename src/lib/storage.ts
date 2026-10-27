@@ -16,7 +16,10 @@ export function loadState(): PersistedState {
   try {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return EMPTY_STATE;
-    return { ...EMPTY_STATE, ...JSON.parse(raw) };
+    const s: PersistedState = { ...EMPTY_STATE, ...JSON.parse(raw) };
+    // 예전 예산 단계(comfort)는 프리미엄으로 이관
+    const fix = (c: TripConditions | null) => (c && !["value", "balanced", "premium"].includes(c.budget) ? { ...c, budget: "premium" as const } : c);
+    return { ...s, conditions: fix(s.conditions), trips: s.trips.map((t) => ({ ...t, profile: { ...t.profile, conditions: fix(t.profile.conditions)! } })) };
   } catch {
     return EMPTY_STATE;
   }

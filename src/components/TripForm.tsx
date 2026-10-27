@@ -89,16 +89,13 @@ export function TripForm({ initial, onSubmit, submitLabel }: { initial: TripCond
       </div>
 
       <div className="form-section">
-        <h2 className="section-title">예산</h2>
+        <h2 className="section-title">여행 스타일</h2>
+        <p className="small muted">금액 대신 어떻게 쓸지만 골라 주세요.</p>
         <div className="seg">
           {(Object.keys(BUDGET) as Budget[]).map((b) => (
-            <button type="button" key={b} className={c.budget === b && c.customBudget === null ? "on" : ""} onClick={() => setC((p) => ({ ...p, budget: b, customBudget: null }))}>{BUDGET[b].label}</button>
+            <button type="button" key={b} className={c.budget === b ? "on" : ""} onClick={() => set("budget", b)}>{BUDGET[b].label}</button>
           ))}
         </div>
-        <label className="field">
-          <span className="label">또는 직접 입력 (1인 기준, 만원)</span>
-          <input className="input" type="number" inputMode="numeric" min={0} placeholder="예: 150" value={c.customBudget ?? ""} onChange={(e) => set("customBudget", e.target.value === "" ? null : Number(e.target.value))} />
-        </label>
       </div>
 
       <div className="form-section">
