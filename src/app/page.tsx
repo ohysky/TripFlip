@@ -1,120 +1,127 @@
 "use client";
-import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
-import { DemoBadge, FreeBadge, PremiumBadge } from "@/components/ui";
-import { getDestinations } from "@/data/repository";
-import { useTripStore, FREE_TRIP_LIMIT } from "@/store/TripStore";
+import { CONCEPTS } from "@/data/regionsV1";
+import type { Concept } from "@/data/regionsV1";
+import { loadQuery, saveQuery } from "@/lib/flow";
+import { tripDays } from "@/services/regionScore";
+import type { ChildBand, IntensityV1, PriceLevel, RegionQuery, StayTier } from "@/services/regionScore";
 
-const THEMES = [
-  { id: "kids", t: "아이와 함께", s: "이동 짧게 · 낮잠 고려" },
-  { id: "relax", t: "리조트 휴양", s: "여유롭게 쉬는 여행" },
-  { id: "food", t: "음식 여행", s: "현지 음식 중심" },
-  { id: "value", t: "가성비 여행", s: "예산 우선" },
+const BANDS: ChildBand[] = ["영아", "유아", "초등", "중고등"];
+const INTENSITY: { v: IntensityV1; label: string }[] = [
+  { v: 1, label: "여유롭게" },
+  { v: 2, label: "보통" },
+  { v: 3, label: "알차게" },
 ];
+const PRICES: PriceLevel[] = ["저렴", "보통", "높음", "상관없음"];
+const STAYS: StayTier[] = ["가성비", "가심비", "프리미엄", "하이엔드"];
+
+function Count({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (n: number) => void }) {
+  return (
+    <div className="stepper" style={{ minHeight: 44 }}>
+      <div className="bold">{label}</div>
+      <div className="ctrl">
+        <button type="button" className="icon-btn" aria-label={`${label} 줄이기`} disabled={value <= min} onClick={() => onChange(value - 1)}>−</button>
+        <span>{value}</span>
+        <button type="button" className="icon-btn" aria-label={`${label} 늘리기`} disabled={value >= max} onClick={() => onChange(value + 1)}><Icon name="plus" /></button>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   const router = useRouter();
-  const { trips, createDemoTrip, showToast, ready } = useTripStore();
-  const dests = getDestinations();
+  const [q, setQ] = useState<RegionQuery | null>(null);
+  const [flying, setFlying] = useState(false);
+  useEffect(() => setQ(loadQuery()), []);
+  if (!q) return null;
 
-  const openDemo = () => {
-    const t = createDemoTrip();
-    if (!t) return showToast(`Free 플랜은 여행을 ${FREE_TRIP_LIMIT}개까지 저장할 수 있어요. 내 여행에서 정리해 주세요.`);
-    router.push(`/trip/${t.id}`);
+  const set = <K extends keyof RegionQuery>(k: K, v: RegionQuery[K]) => setQ({ ...q, [k]: v });
+  const days = q.startDate && q.endDate ? tripDays(q.startDate, q.endDate) : 0;
+  const dateError = days < 2 ? "귀국일은 출발일보다 늦어야 해요 (최소 1박)" : days > 30 ? "최대 30일까지 지원해요" : null;
+  const toggleBand = (b: ChildBand) => {
+    const has = q.children.some((c) => c.band === b);
+    set("children", has ? q.children.filter((c) => c.band !== b) : [...q.children, { band: b, height: null }]);
+  };
+  const setMain = (c: Concept) => setQ({ ...q, main: c, subs: q.subs.filter((s) => s !== c) });
+  const toggleSub = (c: Concept) => set("subs", q.subs.includes(c) ? q.subs.filter((s) => s !== c) : [...q.subs, c]);
+
+  const go = () => {
+    if (dateError) return;
+    saveQuery(q);
+    setFlying(true);
+    setTimeout(() => router.push("/results"), 2200);
   };
 
   return (
-    <main className="container page">
-      <div className="home-grid">
-        <div className="stack-lg">
-          <section className="hero">
-            <h1>나에게 맞는 여행을<br />발견하다</h1>
-            <p>조건을 고르면 여행지 → 숙박 지역 → 방문지 → 식당 → 실제 이동 가능한 일정까지 좁혀 드려요.</p>
-          </section>
+    <main className="container page" style={{ maxWidth: 560 }}>
+      <h1 style={{ fontSize: 24, fontWeight: 900 }}>어디로 떠나볼까요?</h1>
+      <p className="small muted">네 가지만 고르면 어울리는 여행지를 순위로 보여드려요.</p>
 
-          <section className="cta-grid">
-            <Link href="/plan" className="cta-main">
-              <div>
-                <div className="t">여행지 찾아보기</div>
-                <div className="s">날짜·인원·취향으로 어울리는 곳 발견</div>
-              </div>
-              <Icon name="flip" size={28} />
-            </Link>
-            <Link href="/recommend" className="cta-sub">
-              <div>
-                <div className="t">권역 추천 (V1 시범)</div>
-                <div className="muted small">조건별 나트랑·홍콩 점수 비교</div>
-              </div>
-              <Icon name="compass" />
-            </Link>
-            <Link href="/search" className="cta-sub">
-              <div>
-                <div className="t">이미 여행지가 있어요</div>
-                <div className="muted small">대륙 → 국가 → 지역으로 찾기</div>
-              </div>
-              <Icon name="search" />
-            </Link>
-            <Link href="/trips" className="cta-sub">
-              <div>
-                <div className="t">내 여행 보기</div>
-                <div className="muted small">{ready ? (trips.length ? `저장된 여행 ${trips.length}개` : "아직 저장된 여행이 없어요") : " "}</div>
-              </div>
-              <Icon name="suitcase" />
-            </Link>
-          </section>
-
-          <section className="card-soft stack">
-            <div className="row"><DemoBadge /><b>나트랑 가족여행 미리보기</b></div>
-            <p className="small muted">성인 4 · 어린이 2(4세·2세) · 보통 강도 · 리조트 · 점심 11:30 / 저녁 17:00. 아이 동반 일정이 어떻게 짜이는지 바로 확인해 보세요.</p>
-            <button className="btn btn-teal btn-block" onClick={openDemo}>Demo 일정 열기</button>
-          </section>
+      <section className="q-block">
+        <h2>언제 가나요?</h2>
+        <div className="grid-2">
+          <input className="input" type="date" aria-label="출발일" value={q.startDate} onChange={(e) => set("startDate", e.target.value)} />
+          <input className="input" type="date" aria-label="귀국일" value={q.endDate} min={q.startDate} onChange={(e) => set("endDate", e.target.value)} />
         </div>
+        {dateError ? <p className="small" style={{ color: "var(--danger)" }}>{dateError}</p> : <p className="small muted">{days - 1}박 {days}일</p>}
+      </section>
 
-        <div className="stack-lg">
-          <section className="stack">
-            <div className="between">
-              <h2 className="section-title">넘겨보며 발견하기</h2>
-              <Link href="/discover" className="small bold" style={{ color: "var(--teal-dark)" }}>전체 보기</Link>
-            </div>
-            <div className="h-scroll">
-              {dests.map((d) => (
-                <Link key={d.id} href={`/discover?d=${d.id}`} className="mini-dest">
-                  <div className="img" style={{ background: d.tone }}><b>{d.name}</b></div>
-                  <div className="body">
-                    <div className="small muted">{d.country} · {d.nameEn}</div>
-                    <div className="small" style={{ marginTop: 4 }}>{d.reason}</div>
-                    <div className="row-wrap" style={{ marginTop: 8 }}>
-                      {d.character.slice(0, 3).map((c) => <span key={c} className="chip xs">{c}</span>)}
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-            <p className="xs faint">여행지 정보는 시연용 DEMO 데이터예요. 자동 일정은 현재 나트랑만 지원해요.</p>
-          </section>
-
-          <section className="stack">
-            <h2 className="section-title">테마로 시작하기</h2>
-            <div className="theme-grid">
-              {THEMES.map((t) => (
-                <Link key={t.id} href={`/plan?theme=${t.id}`} className="theme">
-                  <b>{t.t}</b>
-                  <span>{t.s}</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-
-          <Link href="/premium" className="card between">
-            <div className="stack" style={{ gap: 4 }}>
-              <div className="row"><FreeBadge /><span className="small">탐색·기본 일정은 계속 무료</span></div>
-              <div className="row"><PremiumBadge /><span className="small">출시 기념 90일 무료</span></div>
-            </div>
-            <Icon name="next" />
-          </Link>
+      <section className="q-block">
+        <h2>누구랑 가나요?</h2>
+        <Count label="성인" value={q.adults} min={1} max={12} onChange={(n) => set("adults", n)} />
+        <div className="chips">
+          {BANDS.map((b) => <button key={b} type="button" className={`toggle-chip ${q.children.some((c) => c.band === b) ? "on" : ""}`} onClick={() => toggleBand(b)}>{b} 자녀</button>)}
+          <button type="button" className={`toggle-chip ${q.elders ? "on" : ""}`} onClick={() => set("elders", !q.elders)}>부모님</button>
+          <button type="button" className={`toggle-chip ${q.pet ? "on" : ""}`} onClick={() => set("pet", !q.pet)}>반려동물</button>
         </div>
+      </section>
+
+      <section className="q-block">
+        <h2>어떤 여행인가요?</h2>
+        <span className="label">메인</span>
+        <div className="chips">
+          {CONCEPTS.map((c) => <button key={c} type="button" className={`toggle-chip ${q.main === c ? "on" : ""}`} onClick={() => setMain(c)}>{c}</button>)}
+        </div>
+        <span className="label">서브 (여러 개)</span>
+        <div className="chips">
+          {CONCEPTS.filter((c) => c !== q.main).map((c) => <button key={c} type="button" className={`toggle-chip ${q.subs.includes(c) ? "on" : ""}`} onClick={() => toggleSub(c)}>{c}</button>)}
+        </div>
+        <span className="label">강도</span>
+        <div className="seg sm">
+          {INTENSITY.map((it) => <button key={it.v} type="button" className={q.perDay === it.v ? "on" : ""} onClick={() => set("perDay", it.v)}>{it.label}</button>)}
+        </div>
+      </section>
+
+      <section className="q-block" style={{ borderBottom: 0 }}>
+        <h2>예산은요?</h2>
+        <span className="label">지역 물가</span>
+        <div className="seg sm">
+          {PRICES.map((p) => <button key={p} type="button" className={q.price === p ? "on" : ""} onClick={() => set("price", p)}>{p}</button>)}
+        </div>
+        <span className="label">숙소</span>
+        <div className="seg sm">
+          {STAYS.map((s) => <button key={s} type="button" className={q.stay === s ? "on" : ""} onClick={() => set("stay", s)}>{s}</button>)}
+        </div>
+      </section>
+
+      <div className="sticky-cta">
+        <button className="btn btn-primary btn-lg btn-block" disabled={!!dateError} onClick={go}>
+          <Icon name="plane" /> 여행지 추천받기
+        </button>
       </div>
+
+      {flying && (
+        <div className="plane-overlay" role="status">
+          <div className="plane-orbit">
+            <span className="plane">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="#fff" aria-hidden><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z" /></svg>
+            </span>
+          </div>
+          <p>나에게 맞는 여행지를 찾는 중…</p>
+        </div>
+      )}
     </main>
   );
 }

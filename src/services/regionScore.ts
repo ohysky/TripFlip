@@ -4,6 +4,8 @@ import type { Concept, MonthWeather, PlaceV1, RegionV1, WeatherJudge } from "@/d
 
 export type ChildBand = "영아" | "유아" | "초등" | "중고등";
 export type IntensityV1 = 1 | 2 | 3;
+export type PriceLevel = "저렴" | "보통" | "높음" | "상관없음";
+export type StayTier = "가성비" | "가심비" | "프리미엄" | "하이엔드";
 
 export interface RegionQuery {
   startDate: string;
@@ -15,6 +17,8 @@ export interface RegionQuery {
   main: Concept;
   subs: Concept[];
   perDay: IntensityV1;
+  price: PriceLevel;
+  stay: StayTier;
 }
 
 export interface ScoredPlace {
@@ -35,6 +39,7 @@ export interface RegionResult {
   weather: { month: number; judge: WeatherJudge; adj: number; source: string };
   excluded: { place: PlaceV1; reason: string }[];
   flags: string[];
+  reasons: string[];
 }
 
 const MAX_SCORE = 5.5;
@@ -64,10 +69,10 @@ export function weatherMonth(start: string, end: string) {
 
 export function judgeWeather(w: MonthWeather, month: number): { judge: WeatherJudge; adj: number } {
   const days = new Date(2026, month, 0).getDate();
-  const sunPerDay = w.sunHours / days;
   const hits: { judge: WeatherJudge; adj: number }[] = [];
   if (w.tmax >= 33) hits.push({ judge: "혹서기", adj: -1 });
-  if (w.rainDays >= 15) hits.push(sunPerDay >= 6 ? { judge: "스콜성 우기", adj: -0.5 } : { judge: "지속형 우기", adj: -1 });
+  // 일조 미확인이면 우기 유형을 가릴 수 없어 감점이 큰 지속형으로 본다
+  if (w.rainDays >= 15) hits.push(w.sunHours !== null && w.sunHours / days >= 6 ? { judge: "스콜성 우기", adj: -0.5 } : { judge: "지속형 우기", adj: -1 });
   if (hits.length) return hits.reduce((a, b) => (b.adj < a.adj ? b : a));
   if (w.rainDays <= 7 && w.tmax >= 18 && w.tmax <= 28) return { judge: "좋음", adj: 0.5 };
   return { judge: "보통", adj: 0 };
@@ -110,16 +115,32 @@ export function scoreRegions(q: RegionQuery): RegionResult[] {
     const weather = { month, ...wj, source: w.source };
     const top = scored.sort((a, b) => b.score - a.score).slice(0, N);
 
-    if (!places.length) return { region, status: "데이터 부족", score: 0, display: 0, rank: 0, top: [], filled: 0, N, weather, excluded, flags: [...flags] };
-    if (!top.length) return { region, status: "조건 충족 장소 없음", score: 0, display: 0, rank: 0, top: [], filled: 0, N, weather, excluded, flags: [...flags] };
+    const base = { region, rank: 0, N, weather, excluded, flags: [...flags] };
+    if (!places.length) return { ...base, status: "데이터 부족", score: 0, display: 0, top: [], filled: 0, reasons: [] };
+    if (!top.length) return { ...base, status: "조건 충족 장소 없음", score: 0, display: 0, top: [], filled: 0, reasons: [] };
 
     const score = top.reduce((s, x) => s + x.score, 0) / N + wj.adj;
     const display = Math.min(100, Math.max(0, (score / MAX_SCORE) * 100));
-    return { region, status: "ranked", score, display, rank: 0, top, filled: top.length, N, weather, excluded, flags: [...flags] };
+    return { ...base, status: "ranked", score, display, top, filled: top.length, reasons: buildReasons(q, top, weather, N) };
   });
 
   // 높은 점수 순, 동점은 공동 순위
   const ranked = results.filter((r) => r.status === "ranked").sort((a, b) => b.score - a.score);
   ranked.forEach((r, i) => (r.rank = i > 0 && r.score === ranked[i - 1].score ? ranked[i - 1].rank : i + 1));
   return [...ranked, ...results.filter((r) => r.status !== "ranked")];
+}
+
+/** 카드에 보여줄 사유: 점수에 실제로 들어간 요소만 쓴다 */
+function buildReasons(q: RegionQuery, top: ScoredPlace[], w: RegionResult["weather"], N: number): string[] {
+  const out: string[] = [];
+  const best = top.filter((t) => t.place.grade === "S" || t.place.grade === "A");
+  if (best.length) out.push(`${best.slice(0, 2).map((t) => t.place.name).join("·")} 등 S·A급 ${best.length}곳`);
+  const main = top.filter((t) => t.weight === 1).length;
+  out.push(`${q.main} 장소 ${main}곳${top.length - main ? ` + ${q.subs.join("·")} ${top.length - main}곳` : ""}`);
+  if (w.adj > 0) out.push(`${w.month}월 날씨 좋음`);
+  else if (w.adj < 0) out.push(`${w.month}월 ${w.judge} (감점)`);
+  if (top.length < N) out.push(`가볼 곳이 ${N}곳 중 ${top.length}곳뿐`);
+  const far = top.filter((t) => t.place.penalty > 0);
+  if (far.length) out.push(`${far.map((t) => t.place.name).join("·")}은 거점에서 멀어 감점`);
+  return out;
 }

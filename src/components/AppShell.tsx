@@ -5,16 +5,14 @@ import { Icon } from "./Icon";
 import { useTripStore } from "@/store/TripStore";
 
 const NAV = [
-  { href: "/", label: "홈", icon: "home" },
-  { href: "/discover", label: "여행지 발견", icon: "compass" },
-  { href: "/trips", label: "내 여행", icon: "suitcase" },
-  { href: "/premium", label: "Premium", icon: "crown" },
+  { href: "/", label: "여행지 추천", icon: "plane" },
+  { href: "/my-trips", label: "내 여행", icon: "suitcase" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const { toast } = useTripStore();
-  const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWith(href) || (href === "/trips" && path.startsWith("/trip/")));
+  const isActive = (href: string) => (href === "/" ? !path.startsWith("/my-trips") : path.startsWith(href));
   return (
     <>
       <header className="header">
