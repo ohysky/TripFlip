@@ -41,6 +41,13 @@ export default function Home() {
               </div>
               <Icon name="flip" size={28} />
             </Link>
+            <Link href="/recommend" className="cta-sub">
+              <div>
+                <div className="t">권역 추천 (V1 시범)</div>
+                <div className="muted small">조건별 나트랑·홍콩 점수 비교</div>
+              </div>
+              <Icon name="compass" />
+            </Link>
             <Link href="/search" className="cta-sub">
               <div>
                 <div className="t">이미 여행지가 있어요</div>
