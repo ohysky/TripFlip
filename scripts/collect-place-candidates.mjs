@@ -5,12 +5,25 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 
 const OUT = process.argv[2] ?? "store/places";
 const UA = "TripFlip/0.1 (https://github.com/ohysky/TripFlip)";
-const MIN_SITELINKS = 8;
+const MIN_SITELINKS = 3;
 const LIMIT = 150;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// 행정구역·교통·학교처럼 여행지가 아닌 게 확실한 유형만 미리 뺀다. 애매한 건 남긴다.
-const DROP = /railway station|metro station|subway station|train station|bus station|^city$|big city|city of|municipality|ward of|special ward|prefecture|province|county|administrative|capital|district of|university|college|school|company|enterprise|business|hospital|airport|embassy|consulate|government|ministry|court|constituency|electoral|census|statistical|organization|political party|sports club|football club|association football|television|newspaper|bank|stock exchange/i;
+// 행정구역·교통·학교·사건처럼 여행지가 아닌 유형이 하나라도 붙은 항목은 뺀다. 유형이 없는 항목도 뺀다.
+const DROP = new RegExp(
+  [
+    "station", "^city$", "big city", "megacity", "metropolis", "city of ", "global city", "municipality", "ward of", "special ward", "prefecture", "province",
+    "county", "administrative", "capital of", "district of", "districts of", "^district$", "urban district", "commune of", "town of", "village of",
+    "department of", "region of", "^region$", "metropolitan area", "dependent territory", "sovereign state", "country",
+    "university", "college", "school", "academic", "research institute", "company", "enterprise", "business", "hospital", "airport", "aerodrome",
+    "air base", "airbase", "military", "embassy", "consulate", "government", "ministry", "court", "constituency", "electoral", "census", "statistical",
+    "organization", "organisation", "political", "sports club", "football club", "sports season", "tournament", "championship", "olympic", "world cup",
+    "television", "newspaper", "^bank$", "stock exchange", "diocese", "event", "attack", "assassination", "shooting", "protest", "demonstration",
+    "fire$", "siege", "battle", "war$", "massacre", "disaster", "earthquake", "language", "treaty", "agreement", "conference", "empire",
+    "historical country", "former entity", "rapid transit", "railway", "metro", "tram", "bus ", "highway", "expressway", "motorway", "colony",
+  ].join("|"),
+  "i",
+);
 
 async function geocode(q) {
   const u = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`;
@@ -27,7 +40,7 @@ async function sparql(lat, lon, radius) {
   OPTIONAL { ?item wdt:P31 ?t . ?t rdfs:label ?tl . FILTER(LANG(?tl) = "en") }
   OPTIONAL { ?item rdfs:label ?en . FILTER(LANG(?en) = "en") }
   OPTIONAL { ?item rdfs:label ?ko . FILTER(LANG(?ko) = "ko") }
-} GROUP BY ?item ?en ?ko ?coord ?sl ORDER BY DESC(?sl) LIMIT 400`;
+} GROUP BY ?item ?en ?ko ?coord ?sl ORDER BY DESC(?sl) LIMIT 800`;
   const r = await fetch("https://query.wikidata.org/sparql", {
     method: "POST",
     headers: { "User-Agent": UA, Accept: "application/sparql-results+json", "Content-Type": "application/x-www-form-urlencoded" },
@@ -55,7 +68,11 @@ for (const reg of regions) {
     for (const radius of [30, 15]) {
       try {
         const items = await sparql(g.lat, g.lon, radius);
-        row.items = items.filter((it) => !it[6] || !it[6].split("|").every((t) => DROP.test(t))).slice(0, LIMIT);
+        const seen = new Set();
+        row.items = items
+          .filter((it) => it[6] && !it[6].split("|").some((t) => DROP.test(t)))
+          .filter((it) => !seen.has(it[0]) && seen.add(it[0]))
+          .slice(0, LIMIT);
         row.radiusKm = radius;
         break;
       } catch (e) {
