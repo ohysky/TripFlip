@@ -8,7 +8,7 @@ const OUT_DIR = process.argv[2] ?? "data/hotels";
 const LOCATIONS = { NT: ["나트랑", "g293928"], HK: ["홍콩", "g294217"], OS: ["오사카", "g298566"], DN: ["다낭", "g298085"], PQ: ["푸꾸옥", "g469418"] };
 const FIELDS = ["key", "name", "type", "rating", "reviews", "price_min", "price_max", "lat", "lng", "labels"];
 const PAGE = 100;
-const MAX_PAGES = 40;
+const MAX_PAGES = 60;
 
 const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
@@ -26,6 +26,7 @@ for (const [id, [name, loc]] of Object.entries(LOCATIONS)) {
   const rows = [];
   let total = 0;
   let error;
+  let empty = 0;
   for (let i = 0; i < MAX_PAGES; i++) {
     const r = await page(loc, i * PAGE);
     if (r.error) {
@@ -36,7 +37,9 @@ for (const [id, [name, loc]] of Object.entries(LOCATIONS)) {
     for (const h of r.list) {
       rows.push([h.key, h.name, h.accommodation_type, h.review_summary?.rating ?? null, h.review_summary?.count ?? null, h.price_ranges?.minimum ?? null, h.price_ranges?.maximum ?? null, h.geo?.latitude ?? null, h.geo?.longitude ?? null, h.merchandising_labels ?? []]);
     }
-    if (r.list.length < PAGE || rows.length >= total) break;
+    // 중간 페이지가 덜 차서 오기도 해서, 빈 페이지가 연달아 나오거나 전체 개수를 넘을 때만 멈춘다
+    empty = r.list.length ? 0 : empty + 1;
+    if (empty >= 2 || (i + 1) * PAGE >= total) break;
     await sleep(1000);
   }
   result.regions[id] = { name, locationKey: loc, total, ...(error ? { error } : {}), hotels: rows };
