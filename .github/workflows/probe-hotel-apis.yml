@@ -3,19 +3,28 @@ name: 숙소 API 확인 (임시)
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Hotellook cache
+      - uses: actions/checkout@v4
+        with:
+          ref: data
+      - name: 호출 결과 저장
         env:
           T: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
         run: |
-          curl -sS -m 30 -w "\nHTTP %{http_code}\n" "https://engine.hotellook.com/api/v2/cache.json?location=Nha%20Trang&currency=krw&checkIn=2026-12-20&checkOut=2026-12-23&limit=5&token=$T" | head -c 1500
-          echo
-          curl -sS -m 30 -w "\nHTTP %{http_code}\n" "https://engine.hotellook.com/api/v2/lookup.json?query=Nha%20Trang&lang=en&lookFor=both&limit=3&token=$T" | head -c 1000
-      - name: Xotelo
-        run: |
-          curl -sS -m 30 -w "\nHTTP %{http_code}\n" "https://data.xotelo.com/api/search?query=Nha%20Trang" | head -c 1200
-          echo
-          curl -sS -m 30 -w "\nHTTP %{http_code}\n" "https://data.xotelo.com/api/list?location_key=g293928&limit=3" | head -c 1500
+          mkdir -p probe
+          {
+            echo "== hotellook cache"; curl -sS -m 30 -w "\nHTTP %{http_code}\n" "https://engine.hotellook.com/api/v2/cache.json?location=Nha%20Trang&currency=krw&checkIn=2026-12-20&checkOut=2026-12-23&limit=5&token=$T" | head -c 1500
+            echo; echo "== hotellook lookup"; curl -sS -m 30 -w "\nHTTP %{http_code}\n" "https://engine.hotellook.com/api/v2/lookup.json?query=Nha%20Trang&lang=en&lookFor=both&limit=3&token=$T" | head -c 1000
+            echo; echo "== xotelo search"; curl -sS -m 30 -w "\nHTTP %{http_code}\n" "https://data.xotelo.com/api/search?query=Nha%20Trang" | head -c 1200
+            echo; echo "== xotelo list"; curl -sS -m 30 -w "\nHTTP %{http_code}\n" "https://data.xotelo.com/api/list?location_key=g293928&limit=3" | head -c 1500
+          } > probe/hotel-apis.txt 2>&1 || true
+          sed -i "s/$T/***/g" probe/hotel-apis.txt
+          git config user.name "tripflip-bot"
+          git config user.email "tripflip-bot@users.noreply.github.com"
+          git add probe && git commit -m "숙소 API 확인 결과" && git push
