@@ -1,0 +1,36 @@
+name: 숙소 가격 수집
+
+# 숙소 데이터도 앱 배포와 분리하려고 data 브랜치에만 쌓는다.
+on:
+  schedule:
+    - cron: "30 0 * * *" # 매일 09:30 KST
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-branch
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: data
+          path: store
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/collect-hotel-prices.mjs store/hotels
+      - name: 결과 커밋
+        working-directory: store
+        run: |
+          git config user.name "tripflip-bot"
+          git config user.email "tripflip-bot@users.noreply.github.com"
+          git add hotels
+          git diff --cached --quiet || git commit -m "숙소 가격 수집 $(date -u +%F)"
+          git pull --rebase
+          git push
