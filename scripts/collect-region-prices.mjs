@@ -42,7 +42,10 @@ async function tripadvisorGeo(name, lat, lon) {
   const e = await getJson(`https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=claims&ids=${ids.join("|")}`);
   let best = null;
   for (const [id, it] of Object.entries(e.entities)) {
-    const ta = it.claims?.P3134?.map((c) => c.mainsnak?.datavalue?.value).find((v) => /^g\d+$/.test(v ?? ""));
+    // 값이 "g298184" 또는 "Tourism-g298184-Tokyo..." 꼴로 섞여 있다. 장소(-d숫자)가 아닌 지역 키만 쓴다.
+    const raw = it.claims?.P3134?.map((c) => c.mainsnak?.datavalue?.value ?? "") ?? [];
+    const ta = raw.filter((v) => !/-d\d+/.test(v)).map((v) => v.match(/(?:^|-)(g\d+)(?:-|$)/)?.[1]).find(Boolean);
+    if (raw.length && !ta) console.log("  P3134 형식 미지원", id, raw.join(" "));
     const c = it.claims?.P625?.[0]?.mainsnak?.datavalue?.value;
     if (!ta || !c) continue;
     const d = km(lat, lon, c.latitude, c.longitude);
