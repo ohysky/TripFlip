@@ -37,15 +37,16 @@ async function wbLatest(indicator) {
 
 async function tripadvisorGeo(name, lat, lon) {
   const s = await getJson(`https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&language=en&limit=8&search=${encodeURIComponent(name)}`);
-  const ids = s.search.map((x) => x.id);
+  const ids = (s.search ?? []).map((x) => x.id);
+  if (!s.search) throw new Error(`wikidata 검색 실패 ${JSON.stringify(s.error ?? s).slice(0, 120)}`);
   if (!ids.length) return null;
   const e = await getJson(`https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=claims&ids=${ids.join("|")}`);
   let best = null;
   const seen = [];
   for (const [id, it] of Object.entries(e.entities)) {
-    // 값이 "g298184" 또는 "Tourism-g298184-Tokyo..." 꼴로 섞여 있다. 장소(-d숫자)가 아닌 지역 키만 쓴다.
-    const raw = it.claims?.P3134?.map((c) => c.mainsnak?.datavalue?.value ?? "") ?? [];
-    const ta = raw.filter((v) => !/-d\d+/.test(v)).map((v) => v.match(/(?:^|-)(g\d+)(?:-|$)/)?.[1]).find(Boolean);
+    // 위키데이터에는 숫자만 들어 있다 ("187147" → Xotelo 키 "g187147")
+    const raw = it.claims?.P3134?.map((c) => String(c.mainsnak?.datavalue?.value ?? "")) ?? [];
+    const ta = raw.map((v) => v.match(/^g?(\d+)$/)?.[1]).find(Boolean)?.replace(/^/, "g");
     const c = it.claims?.P625?.[0]?.mainsnak?.datavalue?.value;
     seen.push({ id, p3134: raw.slice(0, 3), km: c ? Math.round(km(lat, lon, c.latitude, c.longitude)) : null });
     if (!ta || !c) continue;
