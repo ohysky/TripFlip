@@ -41,17 +41,18 @@ async function tripadvisorGeo(name, lat, lon) {
   if (!ids.length) return null;
   const e = await getJson(`https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=claims&ids=${ids.join("|")}`);
   let best = null;
+  const seen = [];
   for (const [id, it] of Object.entries(e.entities)) {
     // 값이 "g298184" 또는 "Tourism-g298184-Tokyo..." 꼴로 섞여 있다. 장소(-d숫자)가 아닌 지역 키만 쓴다.
     const raw = it.claims?.P3134?.map((c) => c.mainsnak?.datavalue?.value ?? "") ?? [];
     const ta = raw.filter((v) => !/-d\d+/.test(v)).map((v) => v.match(/(?:^|-)(g\d+)(?:-|$)/)?.[1]).find(Boolean);
-    if (raw.length && !ta) console.log("  P3134 형식 미지원", id, raw.join(" "));
     const c = it.claims?.P625?.[0]?.mainsnak?.datavalue?.value;
+    seen.push({ id, p3134: raw.slice(0, 3), km: c ? Math.round(km(lat, lon, c.latitude, c.longitude)) : null });
     if (!ta || !c) continue;
     const d = km(lat, lon, c.latitude, c.longitude);
     if (d < 60 && (!best || d < best.km)) best = { qid: id, ta, km: Math.round(d) };
   }
-  return best;
+  return best ?? { seen };
 }
 
 async function hotels(loc) {
@@ -96,8 +97,8 @@ for (const reg of regions) {
   try {
     const g = await tripadvisorGeo(reg.query.split(",")[0], c.lat, c.lon);
     await sleep(500);
-    if (g) Object.assign(row, { tripadvisor: g.ta }, await hotels(g.ta));
-    else row.error = "tripadvisor id 없음";
+    if (g?.ta) Object.assign(row, { tripadvisor: g.ta }, await hotels(g.ta));
+    else Object.assign(row, { error: "tripadvisor id 없음", debug: g?.seen });
   } catch (e) {
     row.error = String(e);
   }
