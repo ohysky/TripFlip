@@ -1,0 +1,43 @@
+name: 장소 등급 산정
+
+# 네이버 블로그 후기로 장소 등급을 매겨 data 브랜치 grades/ 에 저장한다.
+on:
+  schedule:
+    - cron: "0 1 * * 1" # 매주 월요일 10:00 KST
+  workflow_dispatch:
+    inputs:
+      regions:
+        description: "권역 코드 (예: NT 또는 NT,HK). 비우면 전체"
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-branch
+
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: data
+          path: store
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/grade-places.mjs store/grades ${{ github.event.inputs.regions }}
+        env:
+          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+      - name: 결과 커밋
+        working-directory: store
+        run: |
+          git config user.name "tripflip-bot"
+          git config user.email "tripflip-bot@users.noreply.github.com"
+          git add grades
+          git diff --cached --quiet || git commit -m "장소 등급 산정 $(date -u +%F)"
+          git pull --rebase
+          git push
