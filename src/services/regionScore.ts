@@ -3,7 +3,7 @@ import { GRADE_SCORE, PLACES_V1, REGIONS_V1, WEATHER_V1 } from "@/data/regionsV1
 import type { Concept, MonthWeather, PlaceV1, RegionV1, WeatherJudge } from "@/data/regionsV1";
 import { WORLD_PLACES, WORLD_REGIONS } from "@/data/worldV1";
 import { WORLD_WEATHER, WORLD_WEATHER_SOURCE } from "@/data/worldWeather";
-import { COUNTRY_PRICE_LEVEL, FOOD_USD_US, HOTEL_MEDIAN_USD } from "@/data/worldPrices";
+import { COUNTRY_PRICE_LEVEL, FOOD_USD_US, HOTEL_ESTIMATED, HOTEL_MEDIAN_USD } from "@/data/worldPrices";
 
 // 시범 5개 권역은 날씨·도보 정보가 있는 regionsV1을 쓰고, 나머지는 전 세계 데이터(worldV1)를 붙인다.
 const PILOT_TWIN_OF: Record<string, string> = { OS: "jap-osaka", NT: "vie-nhatrang", HK: "hon-hongkong", DN: "vie-danang", PQ: "vie-phuquoc" };
@@ -65,7 +65,7 @@ export interface RegionResult {
   excluded: { place: PlaceV1; reason: string }[];
   flags: string[];
   reasons: string[];
-  stay: { usd: number | null; tier: Exclude<PriceLevel, "상관없음"> | null }; // 1인 1일 체류비 (§5)
+  stay: { usd: number | null; tier: Exclude<PriceLevel, "상관없음"> | null; estimated: boolean }; // 1인 1일 체류비 (§5)
 }
 
 const MAX_SCORE = 5.5;
@@ -159,7 +159,7 @@ export function scoreRegions(q: RegionQuery): RegionResult[] {
     const weather = { month, ...wj, source: w?.source ?? "날씨 데이터 없음" };
     const top = scored.sort((a, b) => b.score - a.score).slice(0, N);
 
-    const base = { region, rank: 0, N, weather, excluded, flags: [...flags], stay: { usd: stayUsd(region, q), tier: null } };
+    const base = { region, rank: 0, N, weather, excluded, flags: [...flags], stay: { usd: stayUsd(region, q), tier: null, estimated: HOTEL_ESTIMATED.has(PILOT_TWIN_OF[region.id] ?? region.id) } };
     if (!places.length) return { ...base, status: "데이터 부족", score: 0, display: 0, top: [], filled: 0, reasons: [] };
     if (!top.length) return { ...base, status: "조건 충족 장소 없음", score: 0, display: 0, top: [], filled: 0, reasons: [] };
 

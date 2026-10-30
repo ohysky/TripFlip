@@ -40,7 +40,7 @@ export default function ResultsPage() {
                 <span className="rank-num">{r.rank}위</span>
                 <div>
                   <div style={{ fontSize: 20, fontWeight: 800 }}>{r.region.name}</div>
-                  <div className="xs muted">{r.region.country} · {r.weather.judge === "미확인" ? "날씨 미확인" : `${r.weather.month}월 ${r.weather.judge}`} · {r.stay.tier ? `물가 ${r.stay.tier} (1인 1일 약 $${Math.round(r.stay.usd!)})` : "물가 미확인"}</div>
+                  <div className="xs muted">{r.region.country} · {r.weather.judge === "미확인" ? "날씨 미확인" : `${r.weather.month}월 ${r.weather.judge}`} · {r.stay.tier ? `물가 ${r.stay.tier}${r.stay.estimated ? "(추정)" : ""} (1인 1일 약 $${Math.round(r.stay.usd!)})` : "물가 미확인"}</div>
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
