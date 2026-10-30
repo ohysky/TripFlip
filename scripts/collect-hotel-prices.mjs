@@ -24,6 +24,7 @@ const result = { collectedAt: now.toISOString(), source: "Xotelo (TripAdvisor �
 
 for (const [id, [name, loc]] of Object.entries(LOCATIONS)) {
   const rows = [];
+  const seen = new Set();
   let total = 0;
   let error;
   let empty = 0;
@@ -35,6 +36,8 @@ for (const [id, [name, loc]] of Object.entries(LOCATIONS)) {
     }
     total = r.total;
     for (const h of r.list) {
+      if (seen.has(h.key)) continue; // 페이지가 겹쳐서 같은 숙소가 다시 오기도 한다
+      seen.add(h.key);
       rows.push([h.key, h.name, h.accommodation_type, h.review_summary?.rating ?? null, h.review_summary?.count ?? null, h.price_ranges?.minimum ?? null, h.price_ranges?.maximum ?? null, h.geo?.latitude ?? null, h.geo?.longitude ?? null, h.merchandising_labels ?? []]);
     }
     // 중간 페이지가 덜 차서 오기도 해서, 빈 페이지가 연달아 나오거나 전체 개수를 넘을 때만 멈춘다
