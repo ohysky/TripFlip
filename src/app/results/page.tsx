@@ -13,8 +13,9 @@ export default function ResultsPage() {
   const results = useMemo(() => (q ? scoreRegions(q) : []), [q]);
   if (!q) return null;
 
-  const ranked = results.filter((r) => r.status === "ranked");
-  const others = results.filter((r) => r.status !== "ranked");
+  // 164개 권역 중 상위 10곳만 보여준다
+  const ranked = results.filter((r) => r.status === "ranked").slice(0, 10);
+  const others = results.filter((r) => r.status !== "ranked" && !r.region.tier); // 시범 권역만 사유 표시
   const days = tripDays(q.startDate, q.endDate);
   const who = [`성인 ${q.adults}`, ...q.children.map((c) => c.band), q.elders ? "부모님" : "", q.pet ? "반려동물" : ""].filter(Boolean).join(" · ");
 
@@ -39,7 +40,7 @@ export default function ResultsPage() {
                 <span className="rank-num">{r.rank}위</span>
                 <div>
                   <div style={{ fontSize: 20, fontWeight: 800 }}>{r.region.name}</div>
-                  <div className="xs muted">{r.region.country} · {r.weather.month}월 {r.weather.judge}</div>
+                  <div className="xs muted">{r.region.country} · {r.weather.judge === "미확인" ? "날씨 미확인" : `${r.weather.month}월 ${r.weather.judge}`}</div>
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
