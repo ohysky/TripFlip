@@ -1,0 +1,28 @@
+== hotellook cache
+<html>
+<head><title>404 Not Found</title></head>
+<body>
+<center><h1>404 Not Found</h1></center>
+<hr><center>nginx</center>
+</body>
+</html>
+
+HTTP 404
+
+== hotellook lookup
+<html>
+<head><title>404 Not Found</title></head>
+<body>
+<center><h1>404 Not Found</h1></center>
+<hr><center>nginx</center>
+</body>
+</html>
+
+HTTP 404
+
+== xotelo search
+{"error":{"status_code":401,"message":"This endpoint is available only for RapidAPI (see more at https://rapidapi.com/anastue-pGK7lGUO-Wo/api/xotelo-hotel-prices)"},"result":null,"timestamp":1793362883426}
+HTTP 200
+
+== xotelo list
+{"error":null,"result":{"total_count":2257,"limit":3,"offset":0,"list":[{"name":"Vinpearl Beachfront Nha Trang","key":"g293928-d15142275","accommodation_type":"Hotel","url":"https://www.tripadvisor.com/Hotel_Review-g293928-d15142275-Reviews-Vinpearl_Beachfront_Nha_Trang-Nha_Trang_Khanh_Hoa_Province.html","review_summary":{"rating":4.9,"count":2244},"price_ranges":{"maximum":109,"minimum":58},"geo":{"latitude":12.23296,"longitude":109.197136},"image":"https://dynamic-media-cdn.tripadvisor.com/media/photo-o/15/0f/b7/39/restaurant.jpg","mentions":[],"merchandising_labels":[]},{"name":"Havana Nha Trang Hotel","key":"g293928-d4328685","accommodation_type":"Hotel","url":"https://www.tripadvisor.com/Hotel_Review-g293928-d4328685-Reviews-Havana_Nha_Trang_Hotel-Nha_Trang_Khanh_Hoa_Province.html","review_summary":{"rating":4.8,"count":3583},"price_ranges":{"maximum":91,"minimum":45},"geo":{"latitude":12.243395,"longitude":109.19584},"image":"https://dynamic-media-cdn.tripadvisor.com/media/photo-o/12/85/56/bc/havana-nha-trang-hotel.jpg","mentions":[],"merchandising_labels":["Breakfast included"]},{"name":"Boton Blue Hotel & Spa","key":"g293928-d13422454","accommodation_type":"Hotel","url":"https://www.tripadvisor.com/Hotel_Review-g293928-d13422454-Reviews-Boton_Blue_Hotel_Spa-Nha_Trang_Khanh_Hoa_Province.html","review_summary":{"rating":4.9,"count":2641},"price_ranges":{"maximum":108,"minimum":35},"geo":{"latitude":12.284777,"longitude":109.20389},"image":"https://dynamic-media-cdn.trip
