@@ -7,6 +7,10 @@ const OUT_DIR = process.argv[2] ?? "data/hotels";
 // 트립어드바이저 지역 키
 const LOCATIONS = { NT: ["나트랑", "g293928"], HK: ["홍콩", "g294217"], OS: ["오사카", "g298566"], DN: ["다낭", "g298085"], PQ: ["푸꾸옥", "g469418"] };
 const FIELDS = ["key", "name", "type", "rating", "reviews", "price_min", "price_max", "lat", "lng", "labels"];
+// 최소 품질 기준 (형님 확정 2026-10-30): 청결도 데이터가 생기기 전까지 총점으로 대신한다.
+// 트립어드바이저 5점 만점 4.5 = 10점 만점 9점.
+const MIN_RATING = 4.5;
+const MIN_REVIEWS = 300;
 const PAGE = 100;
 const MAX_PAGES = 60;
 
@@ -20,7 +24,7 @@ async function page(locationKey, offset) {
 }
 
 const now = new Date();
-const result = { collectedAt: now.toISOString(), source: "Xotelo (TripAdvisor 기반, 비공식)", currency: "USD", priceUnit: "1박 객실", fields: FIELDS, regions: {} };
+const result = { collectedAt: now.toISOString(), source: "Xotelo (TripAdvisor 기반, 비공식)", filter: { minRating: MIN_RATING, minReviews: MIN_REVIEWS }, currency: "USD", priceUnit: "1박 객실", fields: FIELDS, regions: {} };
 
 for (const [id, [name, loc]] of Object.entries(LOCATIONS)) {
   const rows = [];
@@ -45,8 +49,9 @@ for (const [id, [name, loc]] of Object.entries(LOCATIONS)) {
     if (empty >= 2 || (i + 1) * PAGE >= total) break;
     await sleep(1000);
   }
-  result.regions[id] = { name, locationKey: loc, total, ...(error ? { error } : {}), hotels: rows };
-  console.log(`${name}(${loc}): ${rows.length}/${total}곳${error ? ` 오류 ${error}` : ""}`);
+  const kept = rows.filter((h) => (h[3] ?? 0) >= MIN_RATING && (h[4] ?? 0) >= MIN_REVIEWS).sort((a, b) => b[4] - a[4]);
+  result.regions[id] = { name, locationKey: loc, total, scanned: rows.length, ...(error ? { error } : {}), hotels: kept };
+  console.log(`${name}(${loc}): 전체 ${total} → 기준 통과 ${kept.length}곳${error ? ` 오류 ${error}` : ""}`);
 }
 
 await mkdir(OUT_DIR, { recursive: true });
