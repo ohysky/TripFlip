@@ -6,6 +6,7 @@ import { BackButton } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { DEFAULT_PREFS, TRANSPORTS, loadPrefs, savePrefs, useFlowQuery } from "@/lib/flow";
 import type { DayPrefs, Transport } from "@/lib/flow";
+import type { FillMode } from "@/services/itineraryV1";
 import { buildDays, buildTimetable, fmtDate } from "@/services/itineraryV1";
 import { scoreRegions } from "@/services/regionScore";
 
@@ -19,7 +20,9 @@ const BREAKFAST = times("06:00", "10:30");
 
 function DayInner() {
   const { id, n } = useParams<{ id: string; n: string }>();
-  const plan = useSearchParams().get("plan");
+  const sp = useSearchParams();
+  const plan = sp.get("plan");
+  const mode: FillMode = sp.get("mode") === "fill" ? "fill" : "spread";
   const q = useFlowQuery(plan);
   const [prefs, setPrefs] = useState<DayPrefs>(DEFAULT_PREFS);
   useEffect(() => setPrefs(loadPrefs(id)), [id]);
@@ -30,13 +33,13 @@ function DayInner() {
   };
 
   const r = useMemo(() => (q ? scoreRegions(q).find((x) => x.region.id === id) : undefined), [q, id]);
-  const days = useMemo(() => (q && r && r.status === "ranked" ? buildDays(r, q).days : []), [q, r]);
+  const days = useMemo(() => (q && r && r.status === "ranked" ? buildDays(r, q, mode).days : []), [q, r, mode]);
   if (!q) return null;
   const dayNo = Number(n);
   const day = days[dayNo - 1];
   if (!r || !day) return <p className="muted">일정을 찾을 수 없어요.</p>;
   const rows = buildTimetable(day, prefs);
-  const suffix = plan ? `?plan=${plan}` : "";
+  const suffix = `?${new URLSearchParams({ ...(plan ? { plan } : {}), mode })}`;
 
   return (
     <>

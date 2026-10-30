@@ -25,7 +25,7 @@ export const ALL_REGIONS: RegionV1[] = [
     tier: r.tier,
   })),
 ];
-const ALL_PLACES: PlaceV1[] = [...PLACES_V1, ...WORLD_PLACES.filter((p) => !PILOT_TWINS.has(p.region))];
+export const ALL_PLACES: PlaceV1[] = [...PLACES_V1, ...WORLD_PLACES.filter((p) => !PILOT_TWINS.has(p.region))];
 
 export type ChildBand = "영아" | "유아" | "초등" | "중고등";
 export type IntensityV1 = 1 | 2 | 3;

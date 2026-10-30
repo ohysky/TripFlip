@@ -1,8 +1,9 @@
 // 권역 추천 결과(상위 N곳)를 날짜별 일정과 하루 타임테이블로 펼친다.
 // 이동·체류 시간은 실측 전 예상값이다. 화면에 "예상"으로 표시할 것.
+import { GRADE_SCORE } from "@/data/regionsV1";
 import type { PlaceV1 } from "@/data/regionsV1";
 import type { RegionQuery, RegionResult } from "@/services/regionScore";
-import { tripDays } from "@/services/regionScore";
+import { ALL_PLACES, tripDays } from "@/services/regionScore";
 import type { DayPrefs, Transport } from "@/lib/flow";
 
 export const SLOT_LABELS: Record<number, string[]> = { 1: ["하루"], 2: ["오전", "오후"], 3: ["오전", "오후", "저녁"] };
@@ -10,7 +11,7 @@ export const SLOT_LABELS: Record<number, string[]> = { 1: ["하루"], 2: ["오�
 export interface DayPlan {
   day: number;
   date: string; // YYYY-MM-DD
-  slots: { label: string; place: PlaceV1 }[];
+  slots: { label: string; place: PlaceV1; extra?: boolean }[];
   fullDay: boolean;
 }
 
@@ -30,7 +31,22 @@ export function addDays(date: string, n: number) {
   return d.toISOString().slice(0, 10);
 }
 
-export function buildDays(r: RegionResult, q: RegionQuery): { days: DayPlan[]; unplaced: PlaceV1[] } {
+/**
+ * 장소가 모자랄 때 고객이 고르는 방식
+ * - spread: 있는 장소를 날짜에 고루 퍼뜨려 빈 날을 없앤다 (하루 개수가 줄어든다)
+ * - fill: 고른 컨셉 밖 장소까지 등급 순으로 더해 하루 개수를 채운다 (점수에는 안 들어간다)
+ */
+export type FillMode = "spread" | "fill";
+
+/** 컨셉 밖이지만 같은 권역에 있는 장소 (등급 높은 순) */
+function extraPlaces(r: RegionResult, need: number): PlaceV1[] {
+  const used = new Set([...r.top.map((t) => t.place.id), ...r.excluded.map((e) => e.place.id)]);
+  return ALL_PLACES.filter((p) => p.region === r.region.id && !used.has(p.id))
+    .sort((a, b) => GRADE_SCORE[b.grade] - b.penalty - (GRADE_SCORE[a.grade] - a.penalty))
+    .slice(0, need);
+}
+
+export function buildDays(r: RegionResult, q: RegionQuery, mode: FillMode = "spread"): { days: DayPlan[]; unplaced: PlaceV1[] } {
   const D = tripDays(q.startDate, q.endDate);
   const per = q.perDay;
   const days: DayPlan[] = Array.from({ length: D }, (_, i) => ({ day: i + 1, date: addDays(q.startDate, i), slots: [], fullDay: false }));
@@ -50,9 +66,19 @@ export function buildDays(r: RegionResult, q: RegionQuery): { days: DayPlan[]; u
       free.slots.push({ label: "하루", place });
     } else unplaced.push(place);
   }
+  const extra = new Set<PlaceV1>();
+  if (mode === "fill") {
+    const room = days.filter((d) => !d.fullDay).length * per - pool.length;
+    for (const p of extraPlaces(r, room).filter((p) => !isFullDay(p))) {
+      pool.push(p);
+      extra.add(p);
+    }
+  }
   for (const place of pool) {
-    const d = days.find((x) => !x.fullDay && x.slots.length < per);
-    if (d) d.slots.push({ label: "", place });
+    // 채우기: 앞에서부터 하루 개수만큼 / 퍼뜨리기: 가장 덜 찬 날에 하나씩
+    const open = days.filter((x) => !x.fullDay && x.slots.length < per);
+    const d = mode === "fill" ? open[0] : open.reduce<DayPlan | undefined>((a, b) => (!a || b.slots.length < a.slots.length ? b : a), undefined);
+    if (d) d.slots.push({ label: "", place, extra: extra.has(place) });
     else unplaced.push(place);
   }
   // 야경 장소는 그날 마지막 순서로, 시간대 라벨 붙이기
