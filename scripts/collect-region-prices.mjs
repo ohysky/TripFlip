@@ -98,6 +98,9 @@ for (const [ko, iso] of Object.entries(ISO3)) {
   countries[ko] = p && rate ? { iso, priceLevel: +(p.v / rate).toFixed(3), year: p.year } : { iso, priceLevel: null };
 }
 
+// 항공권(원화)과 합칠 때 쓰는 원/달러 연평균 환율
+const krwPerUsd = fx.KOR ? { v: +fx.KOR.v.toFixed(1), year: fx.KOR.year } : null;
+
 const out = {};
 for (const reg of regions) {
   if (only && !only.has(reg.id)) continue;
@@ -130,5 +133,5 @@ if (only) {
   const prev = JSON.parse(await readFile(file, "utf8").catch(() => "{}"));
   for (const [id, row] of Object.entries(prev.regions ?? {})) if (!out[id]) out[id] = row;
 }
-await writeFile(file, JSON.stringify({ collectedAt: new Date().toISOString(), source: { hotels: "Xotelo(트립어드바이저 기반, 비공식) 1박 가격대 USD 중간값", country: "World Bank WDI PA.NUS.PPP ÷ PA.NUS.FCRF (CC BY 4.0)" }, filter: { minRating: MIN_RATING, minReviews: MIN_REVIEWS }, countries, regions: out }));
+await writeFile(file, JSON.stringify({ collectedAt: new Date().toISOString(), source: { hotels: "Xotelo(트립어드바이저 기반, 비공식) 1박 가격대 USD 중간값", country: "World Bank WDI PA.NUS.PPP ÷ PA.NUS.FCRF (CC BY 4.0)" }, filter: { minRating: MIN_RATING, minReviews: MIN_REVIEWS }, krwPerUsd, countries, regions: out }));
 console.log("saved", file);
