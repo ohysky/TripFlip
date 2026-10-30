@@ -3,7 +3,7 @@ import { GRADE_SCORE, PLACES_V1, REGIONS_V1, WEATHER_V1 } from "@/data/regionsV1
 import type { Concept, MonthWeather, PlaceV1, RegionV1, WeatherJudge } from "@/data/regionsV1";
 import { WORLD_PLACES, WORLD_REGIONS } from "@/data/worldV1";
 import { WORLD_WEATHER, WORLD_WEATHER_SOURCE } from "@/data/worldWeather";
-import { COUNTRY_PRICE_LEVEL, FOOD_USD_US, HOTEL_ESTIMATED, HOTEL_MEDIAN_USD } from "@/data/worldPrices";
+import { COUNTRY_PRICE_LEVEL, FLIGHT_ESTIMATED, FLIGHT_KRW, FOOD_USD_US, HOTEL_ESTIMATED, HOTEL_MEDIAN_USD, KRW_PER_USD } from "@/data/worldPrices";
 
 // 시범 5개 권역은 날씨·도보 정보가 있는 regionsV1을 쓰고, 나머지는 전 세계 데이터(worldV1)를 붙인다.
 const PILOT_TWIN_OF: Record<string, string> = { OS: "jap-osaka", NT: "vie-nhatrang", HK: "hon-hongkong", DN: "vie-danang", PQ: "vie-phuquoc" };
@@ -65,7 +65,8 @@ export interface RegionResult {
   excluded: { place: PlaceV1; reason: string }[];
   flags: string[];
   reasons: string[];
-  stay: { usd: number | null; tier: Exclude<PriceLevel, "상관없음"> | null; estimated: boolean }; // 1인 1일 체류비 (§5)
+  // 1인 총경비(원) = 인천 왕복 항공 + 1인 1일 체류비(§5) × 여행일수
+  stay: { usd: number | null; flightKrw: number | null; totalKrw: number | null; tier: Exclude<PriceLevel, "상관없음"> | null; estimated: boolean };
 }
 
 const MAX_SCORE = 5.5;
@@ -79,13 +80,21 @@ function stayUsd(region: RegionV1, q: RegionQuery): number | null {
   return (hotel * Math.ceil(q.adults / 2)) / persons + FOOD_USD_US * level;
 }
 
-/** 체류비 순 하위 1/3 저렴, 중간 보통, 상위 높음. 같은 값·경계는 싼 쪽으로 */
+function stayOf(region: RegionV1, q: RegionQuery): RegionResult["stay"] {
+  const key = PILOT_TWIN_OF[region.id] ?? region.id;
+  const usd = stayUsd(region, q);
+  const flightKrw = FLIGHT_KRW[key] ?? null;
+  const totalKrw = usd != null && flightKrw != null ? Math.round(flightKrw + usd * KRW_PER_USD * tripDays(q.startDate, q.endDate)) : null;
+  return { usd, flightKrw, totalKrw, tier: null, estimated: HOTEL_ESTIMATED.has(key) || FLIGHT_ESTIMATED.has(key) };
+}
+
+/** 1인 총경비 순 하위 1/3 저렴, 중간 보통, 상위 높음. 같은 값·경계는 싼 쪽으로 */
 function stayTiers(rs: RegionResult[]) {
-  const vals = rs.map((r) => r.stay.usd).filter((v): v is number => v != null).sort((a, b) => a - b);
+  const vals = rs.map((r) => r.stay.totalKrw).filter((v): v is number => v != null).sort((a, b) => a - b);
   if (!vals.length) return;
   const cut1 = vals[Math.ceil(vals.length / 3) - 1];
   const cut2 = vals[Math.ceil((vals.length * 2) / 3) - 1];
-  for (const r of rs) if (r.stay.usd != null) r.stay.tier = r.stay.usd <= cut1 ? "저렴" : r.stay.usd <= cut2 ? "보통" : "높음";
+  for (const r of rs) if (r.stay.totalKrw != null) r.stay.tier = r.stay.totalKrw <= cut1 ? "저렴" : r.stay.totalKrw <= cut2 ? "보통" : "높음";
 }
 
 export function tripDays(start: string, end: string) {
@@ -159,7 +168,7 @@ export function scoreRegions(q: RegionQuery): RegionResult[] {
     const weather = { month, ...wj, source: w?.source ?? "날씨 데이터 없음" };
     const top = scored.sort((a, b) => b.score - a.score).slice(0, N);
 
-    const base = { region, rank: 0, N, weather, excluded, flags: [...flags], stay: { usd: stayUsd(region, q), tier: null, estimated: HOTEL_ESTIMATED.has(PILOT_TWIN_OF[region.id] ?? region.id) } };
+    const base = { region, rank: 0, N, weather, excluded, flags: [...flags], stay: stayOf(region, q) };
     if (!places.length) return { ...base, status: "데이터 부족", score: 0, display: 0, top: [], filled: 0, reasons: [] };
     if (!top.length) return { ...base, status: "조건 충족 장소 없음", score: 0, display: 0, top: [], filled: 0, reasons: [] };
 

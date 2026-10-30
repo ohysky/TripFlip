@@ -40,7 +40,7 @@ export default function ResultsPage() {
                 <span className="rank-num">{r.rank}위</span>
                 <div>
                   <div style={{ fontSize: 20, fontWeight: 800 }}>{r.region.name}</div>
-                  <div className="xs muted">{r.region.country} · {r.weather.judge === "미확인" ? "날씨 미확인" : `${r.weather.month}월 ${r.weather.judge}`} · {r.stay.tier ? `물가 ${r.stay.tier}${r.stay.estimated ? "(추정)" : ""} (1인 1일 약 $${Math.round(r.stay.usd!)})` : "물가 미확인"}</div>
+                  <div className="xs muted">{r.region.country} · {r.weather.judge === "미확인" ? "날씨 미확인" : `${r.weather.month}월 ${r.weather.judge}`} · {r.stay.tier ? `경비 ${r.stay.tier}${r.stay.estimated ? "(추정)" : ""} · 1인 약 ${Math.round(r.stay.totalKrw! / 10000)}만원(항공 ${Math.round(r.stay.flightKrw! / 10000)}만)` : "경비 미확인"}</div>
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
@@ -62,7 +62,7 @@ export default function ResultsPage() {
 
       <div className="stack" style={{ marginTop: 18, gap: 6 }}>
         {TEMP_GRADE && <p className="xs faint">장소 등급은 한국어 후기 판정 전 임시 등급이에요. 점수는 구조 확인용이에요.</p>}
-        {q.price !== "상관없음" && <p className="xs faint">물가 &lsquo;{q.price}&rsquo; 권역만 보여줘요. 1인 1일 체류비(숙소+식비 추정)로 나눴고, 물가를 모르는 {results.filter((r) => r.status === "물가 미확인").length}곳은 뺐어요.</p>}
+        {q.price !== "상관없음" && <p className="xs faint">경비 &lsquo;{q.price}&rsquo; 권역만 보여줘요. 1인 총경비(인천 왕복 항공 + 숙소 + 식비)로 나눴고, 경비를 모르는 {results.filter((r) => r.status === "물가 미확인").length}곳은 뺐어요.</p>}
       </div>
     </main>
   );
