@@ -2,6 +2,7 @@
 import { GRADE_SCORE, PLACES_V1, REGIONS_V1, WEATHER_V1 } from "@/data/regionsV1";
 import type { Concept, MonthWeather, PlaceV1, RegionV1, WeatherJudge } from "@/data/regionsV1";
 import { WORLD_PLACES, WORLD_REGIONS } from "@/data/worldV1";
+import { WORLD_WEATHER, WORLD_WEATHER_SOURCE } from "@/data/worldWeather";
 
 // 시범 5개 권역은 날씨·도보 정보가 있는 regionsV1을 쓰고, 나머지는 전 세계 데이터(worldV1)를 붙인다.
 const PILOT_TWINS = new Set(["jap-osaka", "vie-nhatrang", "hon-hongkong", "vie-danang", "vie-phuquoc"]);
@@ -132,7 +133,7 @@ export function scoreRegions(q: RegionQuery): RegionResult[] {
       scored.push({ place: p, weight, score: (GRADE_SCORE[p.grade] - p.penalty) * weight });
     }
 
-    const w = WEATHER_V1[region.id];
+    const w = WEATHER_V1[region.id] ?? (WORLD_WEATHER[region.id] ? { source: WORLD_WEATHER_SOURCE, months: WORLD_WEATHER[region.id] } : undefined);
     const wj = w ? judgeWeather(w.months[month], month) : { judge: "미확인" as const, adj: 0 };
     const weather = { month, ...wj, source: w?.source ?? "날씨 데이터 없음" };
     const top = scored.sort((a, b) => b.score - a.score).slice(0, N);
