@@ -3,9 +3,11 @@ import { GRADE_SCORE, PLACES_V1, REGIONS_V1, WEATHER_V1 } from "@/data/regionsV1
 import type { Concept, MonthWeather, PlaceV1, RegionV1, WeatherJudge } from "@/data/regionsV1";
 import { WORLD_PLACES, WORLD_REGIONS } from "@/data/worldV1";
 import { WORLD_WEATHER, WORLD_WEATHER_SOURCE } from "@/data/worldWeather";
+import { COUNTRY_PRICE_LEVEL, FOOD_USD_US, HOTEL_MEDIAN_USD } from "@/data/worldPrices";
 
 // 시범 5개 권역은 날씨·도보 정보가 있는 regionsV1을 쓰고, 나머지는 전 세계 데이터(worldV1)를 붙인다.
-const PILOT_TWINS = new Set(["jap-osaka", "vie-nhatrang", "hon-hongkong", "vie-danang", "vie-phuquoc"]);
+const PILOT_TWIN_OF: Record<string, string> = { OS: "jap-osaka", NT: "vie-nhatrang", HK: "hon-hongkong", DN: "vie-danang", PQ: "vie-phuquoc" };
+const PILOT_TWINS = new Set(Object.values(PILOT_TWIN_OF));
 const TONES = ["#00ACB8", "#102F54", "#f2994a", "#2d9cdb", "#eb5757", "#27ae60", "#9b51e0"];
 export const ALL_REGIONS: RegionV1[] = [
   ...REGIONS_V1,
@@ -52,7 +54,7 @@ export interface ScoredPlace {
 
 export interface RegionResult {
   region: RegionV1;
-  status: "ranked" | "데이터 부족" | "조건 충족 장소 없음";
+  status: "ranked" | "데이터 부족" | "조건 충족 장소 없음" | "예산 밖" | "물가 미확인";
   score: number; // 권역 점수
   display: number; // 0~100
   rank: number;
@@ -63,9 +65,28 @@ export interface RegionResult {
   excluded: { place: PlaceV1; reason: string }[];
   flags: string[];
   reasons: string[];
+  stay: { usd: number | null; tier: Exclude<PriceLevel, "상관없음"> | null }; // 1인 1일 체류비 (§5)
 }
 
 const MAX_SCORE = 5.5;
+
+/** §5 1인 1일 체류비(USD) = 숙소 1박 × 객실 수 ÷ 인원 + 식비. 재료가 하나라도 없으면 null */
+function stayUsd(region: RegionV1, q: RegionQuery): number | null {
+  const hotel = HOTEL_MEDIAN_USD[PILOT_TWIN_OF[region.id] ?? region.id];
+  const level = COUNTRY_PRICE_LEVEL[region.country];
+  if (hotel == null || level == null) return null;
+  const persons = q.adults + q.children.length;
+  return (hotel * Math.ceil(q.adults / 2)) / persons + FOOD_USD_US * level;
+}
+
+/** 체류비 순 하위 1/3 저렴, 중간 보통, 상위 높음. 같은 값·경계는 싼 쪽으로 */
+function stayTiers(rs: RegionResult[]) {
+  const vals = rs.map((r) => r.stay.usd).filter((v): v is number => v != null).sort((a, b) => a - b);
+  if (!vals.length) return;
+  const cut1 = vals[Math.ceil(vals.length / 3) - 1];
+  const cut2 = vals[Math.ceil((vals.length * 2) / 3) - 1];
+  for (const r of rs) if (r.stay.usd != null) r.stay.tier = r.stay.usd <= cut1 ? "저렴" : r.stay.usd <= cut2 ? "보통" : "높음";
+}
 
 export function tripDays(start: string, end: string) {
   const ms = new Date(end).getTime() - new Date(start).getTime();
@@ -138,7 +159,7 @@ export function scoreRegions(q: RegionQuery): RegionResult[] {
     const weather = { month, ...wj, source: w?.source ?? "날씨 데이터 없음" };
     const top = scored.sort((a, b) => b.score - a.score).slice(0, N);
 
-    const base = { region, rank: 0, N, weather, excluded, flags: [...flags] };
+    const base = { region, rank: 0, N, weather, excluded, flags: [...flags], stay: { usd: stayUsd(region, q), tier: null } };
     if (!places.length) return { ...base, status: "데이터 부족", score: 0, display: 0, top: [], filled: 0, reasons: [] };
     if (!top.length) return { ...base, status: "조건 충족 장소 없음", score: 0, display: 0, top: [], filled: 0, reasons: [] };
 
@@ -146,6 +167,11 @@ export function scoreRegions(q: RegionQuery): RegionResult[] {
     const display = Math.min(100, Math.max(0, (score / MAX_SCORE) * 100));
     return { ...base, status: "ranked", score, display, top, filled: top.length, reasons: buildReasons(q, top, weather, N) };
   });
+
+  // 예산은 점수 전 거르기 (§5): 고른 물가 등급이 아니면 순위에서 뺀다
+  stayTiers(results);
+  if (q.price !== "상관없음")
+    for (const r of results) if (r.status === "ranked" && r.stay.tier !== q.price) r.status = r.stay.tier ? "예산 밖" : "물가 미확인";
 
   // 높은 점수 순, 동점은 공동 순위
   const ranked = results.filter((r) => r.status === "ranked").sort((a, b) => b.score - a.score);
