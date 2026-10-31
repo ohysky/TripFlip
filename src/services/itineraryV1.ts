@@ -5,6 +5,7 @@ import type { PlaceV1 } from "@/data/regionsV1";
 import type { RegionQuery, RegionResult } from "@/services/regionScore";
 import { ALL_PLACES, tripDays } from "@/services/regionScore";
 import type { DayPrefs, Transport } from "@/lib/flow";
+import { PLACE_ATTRS } from "@/data/placeAttrs";
 
 export const SLOT_LABELS: Record<number, string[]> = { 1: ["하루"], 2: ["오전", "오후"], 3: ["오전", "오후", "저녁"] };
 
@@ -15,9 +16,13 @@ export interface DayPlan {
   fullDay: boolean;
 }
 
-const isNight = (p: PlaceV1) => p.tags.includes("야경·야시장");
+// 시간대·체류·아이친화는 GPT·제미나이 추정값(PLACE_ATTRS). 없으면 태그로 판단한다.
+const slotOf = (p: PlaceV1) => PLACE_ATTRS[p.id]?.[0];
+export const kidFit = (p: PlaceV1) => PLACE_ATTRS[p.id]?.[2];
+const isNight = (p: PlaceV1) => slotOf(p) === "저녁" || (!slotOf(p) && p.tags.includes("야경·야시장"));
+const ORDER = { 오전: 0, 아무때나: 1, 오후: 2, 저녁: 3, 종일: 1 } as const;
 /** 테마파크·먼 당일 명소는 하루를 통째로 쓴다 */
-export const isFullDay = (p: PlaceV1) => p.tags.includes("테마파크") || p.penalty > 0 || p.travel.includes("페리");
+export const isFullDay = (p: PlaceV1) => slotOf(p) === "종일" || p.penalty > 0 || p.travel.includes("페리") || (!slotOf(p) && p.tags.includes("테마파크"));
 
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 export function fmtDate(d: string) {
@@ -84,7 +89,7 @@ export function buildDays(r: RegionResult, q: RegionQuery, mode: FillMode = "spr
   // 야경 장소는 그날 마지막 순서로, 시간대 라벨 붙이기
   for (const d of days) {
     if (d.fullDay) continue;
-    d.slots.sort((a, b) => Number(isNight(a.place)) - Number(isNight(b.place)));
+    d.slots.sort((a, b) => (isNight(a.place) ? 3 : ORDER[slotOf(a.place) ?? "아무때나"]) - (isNight(b.place) ? 3 : ORDER[slotOf(b.place) ?? "아무때나"]));
     // 하루를 통째로 쓰지 않는 장소 하나만 있는 날은 "하루"가 아니라 오전 일정 + 자유 시간이다
     d.slots.forEach((s, i) => (s.label = d.slots.length === 1 && !isNight(s.place) ? "오전" : (SLOT_LABELS[per][i] ?? "")));
   }
@@ -121,6 +126,8 @@ export function rainFit(p: PlaceV1): "○" | "△" | "×" {
 }
 
 export function stayMinutes(p: PlaceV1, fullDay: boolean) {
+  const m = PLACE_ATTRS[p.id]?.[1];
+  if (m) return fullDay ? Math.max(m, 240) : Math.min(m, 300);
   if (fullDay) return p.tags.includes("테마파크") ? 420 : 240;
   if (p.tags.some((t) => ["해변·섬", "골프", "해양", "온천"].includes(t))) return 180;
   return 120;
@@ -161,7 +168,7 @@ export function buildTimetable(day: DayPlan, prefs: DayPrefs): TimeRow[] {
     rows.push({ time: toTime(t), end: toTime(t + move), kind: "move", title: `이동 · ${prefs.transport}`, sub: `약 ${move}분 (예상)` });
     t += move;
     const stay = stayMinutes(s.place, day.fullDay);
-    rows.push({ time: toTime(t), end: toTime(t + stay), kind: "visit", title: s.place.name, sub: `${s.label} · ${s.place.tags.join(" · ")} · 체류 ${stay / 60}시간 (예상) · 비 오는 날 ${rainFit(s.place)}` });
+    rows.push({ time: toTime(t), end: toTime(t + stay), kind: "visit", title: s.place.name, sub: `${s.label} · ${s.place.tags.join(" · ")} · 체류 ${stay >= 60 ? `${stay / 60}시간` : `${stay}분`} (예상) · 비 오는 날 ${rainFit(s.place)}${kidFit(s.place) ? ` · 아이 ${kidFit(s.place)}` : ""}` });
     if (day.fullDay && stay >= 240) {
       lunch = true; // 하루 일정 장소 안에서 점심
       rows[rows.length - 1].sub += " · 점심 포함";
