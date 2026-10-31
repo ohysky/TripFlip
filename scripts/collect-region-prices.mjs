@@ -63,6 +63,7 @@ async function tripadvisorCandidates(lat, lon) {
 async function hotels(loc, lat, lon) {
   const prices = [];
   const dists = [];
+  const kept = []; // 추천 숙소용: [이름, 평점, 리뷰 수, 최저가, 최고가, 트립어드바이저 키]
   let scanned = 0;
   for (let i = 0; i < PAGES; i++) {
     const r = await fetch(`https://data.xotelo.com/api/list?location_key=${loc}&limit=100&offset=${i * 100}&sort=popularity`);
@@ -73,7 +74,10 @@ async function hotels(loc, lat, lon) {
     for (const h of list) {
       const ok = (h.review_summary?.rating ?? 0) >= MIN_RATING && (h.review_summary?.count ?? 0) >= MIN_REVIEWS;
       const lo = h.price_ranges?.minimum, hi = h.price_ranges?.maximum;
-      if (ok && lo > 0 && hi > 0) prices.push((lo + hi) / 2);
+      if (ok && lo > 0 && hi > 0) {
+        prices.push((lo + hi) / 2);
+        kept.push([h.name, h.review_summary.rating, h.review_summary.count, lo, hi, h.key]);
+      }
       if (h.geo?.latitude != null) dists.push(km(lat, lon, h.geo.latitude, h.geo.longitude));
     }
     if (list.length < 100) break;
@@ -81,7 +85,7 @@ async function hotels(loc, lat, lon) {
   }
   const m = median(prices);
   // 5곳 미만이면 가격대가 한두 숙소에 좌우돼서 쓰지 않는다
-  return { scanned, passed: prices.length, medianUsd: prices.length >= MIN_HOTELS ? Math.round(m) : null, hotelKm: dists.length ? Math.round(median(dists)) : null };
+  return { scanned, passed: prices.length, medianUsd: prices.length >= MIN_HOTELS ? Math.round(m) : null, hotelKm: dists.length ? Math.round(median(dists)) : null, hotels: kept.slice(0, 60) };
 }
 
 const regions = JSON.parse(await readFile(new URL("./world-regions.json", import.meta.url), "utf8"));
