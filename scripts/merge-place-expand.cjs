@@ -24,7 +24,7 @@ function load(f, src) {
     return { region, qid: q.startsWith("Q") ? q : null, ko, en, grade: GR.includes(g) ? g : "C", concepts: (c || "").split(",").map((x) => x.trim()).filter((x) => CONCEPTS.has(x)), tag: TAGS.has(t) ? t : t === "베이커리·디저트" ? "카페·디저트" : "명소", src };
   });
 }
-const all = [...load("gemini-all.txt", "G"), ...load("gpt-all.txt", "P")].filter((x) => !DROP.test(x.en));
+const all = [...load(process.argv[2] ?? "gemini-all.txt", "G"), ...load(process.argv[3] ?? "gpt-all.txt", "P")].filter((x) => !DROP.test(x.en));
 const groups = {};
 for (const x of all) {
   const k = x.region + "|" + (x.qid || norm(x.en).slice(0, 14));
@@ -70,7 +70,7 @@ for (const [rid, gs] of Object.entries(perRegion)) {
     }
     n++;
     s.both ? stats.both++ : stats.single++;
-    out.push({ id: `${rid}-x${n}`, region: rid, name: s.base.ko, en: s.base.en, concepts: s.concepts.length ? s.concepts : ["관광"], tags: [s.base.tag], travel, penalty, grade: s.grade, ...(qid ? { qid } : {}), ...(c ? { lat: c[0], lon: c[1] } : {}) });
+    out.push({ id: `${rid}-x${P.filter((p) => p.region === rid).length + n}`, region: rid, name: s.base.ko, en: s.base.en, concepts: s.concepts.length ? s.concepts : ["관광"], tags: [s.base.tag], travel, penalty, grade: s.grade, ...(qid ? { qid } : {}), ...(c ? { lat: c[0], lon: c[1] } : {}) });
   }
 }
 fs.writeFileSync("src/data/worldV1.ts", ts.slice(0, ps) + PH + "[\n" + [...P, ...out].map((x) => JSON.stringify(x)).join(",\n") + "\n];" + ts.slice(pe));
