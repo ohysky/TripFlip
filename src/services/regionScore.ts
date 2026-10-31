@@ -25,7 +25,19 @@ export const ALL_REGIONS: RegionV1[] = [
     tier: r.tier,
   })),
 ];
-export const ALL_PLACES: PlaceV1[] = [...PLACES_V1, ...WORLD_PLACES.filter((p) => !PILOT_TWINS.has(p.region))];
+// 시범 권역은 손으로 넣은 장소(PLACES_V1)가 기본이고, 전세계 데이터의 같은 권역 장소 중 이름이 겹치지 않는 곳을 더한다
+const PILOT_OF = Object.fromEntries(Object.entries(PILOT_TWIN_OF).map(([k, v]) => [v, k]));
+const pilotKeys = new Set(PLACES_V1.map((p) => `${p.region}|${p.en.toLowerCase()}`));
+export const ALL_PLACES: PlaceV1[] = [
+  ...PLACES_V1,
+  ...WORLD_PLACES.flatMap((p) => {
+    const pilot = PILOT_OF[p.region];
+    if (!pilot) return [p];
+    if (pilotKeys.has(`${pilot}|${p.en.toLowerCase()}`)) return [];
+    if (PLACES_V1.some((q) => q.region === pilot && (q.name.startsWith(p.name) || p.name.startsWith(q.name)))) return [];
+    return [{ ...p, region: pilot }];
+  }),
+];
 
 export type ChildBand = "영아" | "유아" | "초등" | "중고등";
 export type IntensityV1 = 1 | 2 | 3;
