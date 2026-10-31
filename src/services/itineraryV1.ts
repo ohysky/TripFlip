@@ -91,7 +91,7 @@ export function buildDays(r: RegionResult, q: RegionQuery, mode: FillMode = "spr
     if (d.fullDay) continue;
     d.slots.sort((a, b) => (isNight(a.place) ? 3 : ORDER[slotOf(a.place) ?? "아무때나"]) - (isNight(b.place) ? 3 : ORDER[slotOf(b.place) ?? "아무때나"]));
     // 하루를 통째로 쓰지 않는 장소 하나만 있는 날은 "하루"가 아니라 오전 일정 + 자유 시간이다
-    d.slots.forEach((s, i) => (s.label = d.slots.length === 1 && !isNight(s.place) ? "오전" : (SLOT_LABELS[per][i] ?? "")));
+    d.slots.forEach((s, i) => (s.label = d.slots.length === 1 ? (isNight(s.place) ? "저녁" : "오전") : (SLOT_LABELS[per][i] ?? "")));
   }
   return { days, unplaced };
 }
@@ -160,6 +160,7 @@ export function buildTimetable(day: DayPlan, prefs: DayPrefs): TimeRow[] {
       lunch = true;
     }
     if (night && !dinner) {
+      if (toMin("17:30") - t >= 90) rows.push({ time: toTime(t), end: "17:30", kind: "rest", title: "자유 시간", sub: "숙소 휴식·주변 산책 (일정 없음)" });
       t = Math.max(t, toMin("17:30"));
       meal("저녁");
       dinner = true;
@@ -177,21 +178,33 @@ export function buildTimetable(day: DayPlan, prefs: DayPrefs): TimeRow[] {
     prevFar = baseMinutes(s.place);
   });
 
-  if (!dinner && day.slots.length) {
-    if (!lunch && !day.fullDay) {
-      t = Math.max(t, toMin("11:30"));
-      meal("점심");
-    }
-    // 저녁까지 1시간 반 넘게 비면 빈칸 대신 자유 시간으로 보여준다
-    if (toMin("17:30") - t >= 90) rows.push({ time: toTime(t), end: "17:30", kind: "rest", title: "자유 시간", sub: "숙소 휴식·주변 산책 (일정 없음)" });
-    t = Math.max(t, toMin("17:30"));
-    meal("저녁");
-  }
-  if (day.slots.length) {
-    const back = round5((day.fullDay ? prevFar : 30) * f);
-    rows.push({ time: toTime(t), end: toTime(t + back), kind: "move", title: `숙소 복귀 · ${prefs.transport}`, sub: `약 ${back}분 (예상)` });
-  } else {
+  if (!day.slots.length) {
     rows.push({ time: toTime(t), kind: "rest", title: "자유 일정", sub: "추천 장소가 배정되지 않은 날" });
+    return rows;
   }
+  const back = round5((day.fullDay ? prevFar : 30) * f);
+  const goBack = () => {
+    rows.push({ time: toTime(t), end: toTime(t + back), kind: "move", title: `숙소 복귀 · ${prefs.transport}`, sub: `약 ${back}분 (예상)` });
+    t += back;
+  };
+  if (dinner) {
+    goBack();
+    return rows;
+  }
+  if (!lunch && !day.fullDay) {
+    t = Math.max(t, toMin("11:30"));
+    meal("점심");
+  }
+  // 저녁까지 1시간 반 넘게 남으면: 숙소로 먼저 돌아가 쉬고, 저녁은 숙소 근처에서 먹는다
+  if (toMin("17:30") - (t + back) >= 90) {
+    goBack();
+    rows.push({ time: toTime(t), end: "17:30", kind: "rest", title: "숙소 휴식", sub: "수영장·휴식 등 자유 시간" });
+    t = toMin("17:30");
+    rows.push({ time: toTime(t), end: toTime(t + 60), kind: "meal", title: "저녁", sub: "숙소 주변 식당" });
+    return rows;
+  }
+  t = Math.max(t, toMin("17:30"));
+  meal("저녁");
+  goBack();
   return rows;
 }
