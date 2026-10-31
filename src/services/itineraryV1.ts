@@ -148,12 +148,16 @@ export function buildTimetable(day: DayPlan, prefs: DayPrefs): TimeRow[] {
   let dinner = false;
   let prevFar = 0;
 
-  const meal = (title: "점심" | "저녁") => {
-    rows.push({ time: toTime(t), end: toTime(t + 60), kind: "meal", title, sub: "주변 식당" });
+  // 일정에 든 식당(로컬푸드)은 관광지처럼 따로 가지 않고 점심·저녁 자리에 넣는다
+  const isFood = (p: PlaceV1) => p.tags.includes("로컬푸드") || /레스토랑|식당|씨푸드|Restaurant|Seafood/i.test(p.name + p.en);
+  const food = day.slots.filter((s) => isFood(s.place)).map((s) => s.place);
+  const meal = (title: "점심" | "저녁", near = "주변 식당") => {
+    const r = food.shift();
+    rows.push({ time: toTime(t), end: toTime(t + 60), kind: "meal", title: r ? `${title} · ${r.name}` : title, sub: r ? `추천 식당 · ${r.en}` : near });
     t += 60;
   };
 
-  day.slots.forEach((s, i) => {
+  day.slots.filter((s) => !isFood(s.place)).forEach((s, i) => {
     const night = s.label === "저녁";
     if (!lunch && t >= toMin("11:30") && !day.fullDay) {
       meal("점심");
@@ -192,6 +196,14 @@ export function buildTimetable(day: DayPlan, prefs: DayPrefs): TimeRow[] {
     return rows;
   }
   if (!lunch && !day.fullDay) {
+    // 식당만 있는 날: 오전은 쉬고, 점심 식당으로 이동
+    if (food.length && !rows.some((r) => r.kind === "visit")) {
+      const go = toMin("11:00");
+      if (go - t >= 60) rows.push({ time: toTime(t), end: toTime(go), kind: "rest", title: "오전 자유 시간", sub: "숙소 휴식·주변 산책 (일정 없음)" });
+      t = Math.max(t, go);
+      rows.push({ time: toTime(t), end: toTime(t + 30), kind: "move", title: `이동 · ${prefs.transport}`, sub: "약 30분 (예상)" });
+      t += 30;
+    }
     t = Math.max(t, toMin("11:30"));
     meal("점심");
   }
@@ -200,7 +212,7 @@ export function buildTimetable(day: DayPlan, prefs: DayPrefs): TimeRow[] {
     goBack();
     rows.push({ time: toTime(t), end: "17:30", kind: "rest", title: "숙소 휴식", sub: "수영장·휴식 등 자유 시간" });
     t = toMin("17:30");
-    rows.push({ time: toTime(t), end: toTime(t + 60), kind: "meal", title: "저녁", sub: "숙소 주변 식당" });
+    meal("저녁", "숙소 주변 식당");
     return rows;
   }
   t = Math.max(t, toMin("17:30"));
