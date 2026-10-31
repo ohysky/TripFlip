@@ -111,6 +111,15 @@ export function baseMinutes(p: PlaceV1) {
   return 30;
 }
 
+/** 비 오는 날 적합도: 태그로 판정 (○ 실내 위주 / △ 반반 / × 실외) */
+const RAIN_OK = ["쇼핑몰·아웃렛", "카페·디저트", "로컬푸드", "마사지·스파"];
+const RAIN_NO = ["해변·섬", "자연경관", "트레킹·하이킹", "해양", "스키", "골프"];
+export function rainFit(p: PlaceV1): "○" | "△" | "×" {
+  if (p.tags.some((t) => RAIN_NO.includes(t))) return "×";
+  if (p.tags.some((t) => RAIN_OK.includes(t))) return "○";
+  return "△";
+}
+
 export function stayMinutes(p: PlaceV1, fullDay: boolean) {
   if (fullDay) return p.tags.includes("테마파크") ? 420 : 240;
   if (p.tags.some((t) => ["해변·섬", "골프", "해양", "온천"].includes(t))) return 180;
@@ -152,7 +161,7 @@ export function buildTimetable(day: DayPlan, prefs: DayPrefs): TimeRow[] {
     rows.push({ time: toTime(t), end: toTime(t + move), kind: "move", title: `이동 · ${prefs.transport}`, sub: `약 ${move}분 (예상)` });
     t += move;
     const stay = stayMinutes(s.place, day.fullDay);
-    rows.push({ time: toTime(t), end: toTime(t + stay), kind: "visit", title: s.place.name, sub: `${s.label} · ${s.place.tags.join(" · ")} · 체류 ${stay / 60}시간 (예상)` });
+    rows.push({ time: toTime(t), end: toTime(t + stay), kind: "visit", title: s.place.name, sub: `${s.label} · ${s.place.tags.join(" · ")} · 체류 ${stay / 60}시간 (예상) · 비 오는 날 ${rainFit(s.place)}` });
     if (day.fullDay && stay >= 240) {
       lunch = true; // 하루 일정 장소 안에서 점심
       rows[rows.length - 1].sub += " · 점심 포함";
