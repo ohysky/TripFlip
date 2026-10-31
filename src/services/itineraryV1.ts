@@ -85,7 +85,8 @@ export function buildDays(r: RegionResult, q: RegionQuery, mode: FillMode = "spr
   for (const d of days) {
     if (d.fullDay) continue;
     d.slots.sort((a, b) => Number(isNight(a.place)) - Number(isNight(b.place)));
-    d.slots.forEach((s, i) => (s.label = SLOT_LABELS[per][i] ?? ""));
+    // 하루를 통째로 쓰지 않는 장소 하나만 있는 날은 "하루"가 아니라 오전 일정 + 자유 시간이다
+    d.slots.forEach((s, i) => (s.label = d.slots.length === 1 && !isNight(s.place) ? "오전" : (SLOT_LABELS[per][i] ?? "")));
   }
   return { days, unplaced };
 }
@@ -161,6 +162,12 @@ export function buildTimetable(day: DayPlan, prefs: DayPrefs): TimeRow[] {
   });
 
   if (!dinner && day.slots.length) {
+    if (!lunch && !day.fullDay) {
+      t = Math.max(t, toMin("11:30"));
+      meal("점심");
+    }
+    // 저녁까지 1시간 반 넘게 비면 빈칸 대신 자유 시간으로 보여준다
+    if (toMin("17:30") - t >= 90) rows.push({ time: toTime(t), end: "17:30", kind: "rest", title: "자유 시간", sub: "숙소 휴식·주변 산책 (일정 없음)" });
     t = Math.max(t, toMin("17:30"));
     meal("저녁");
   }
