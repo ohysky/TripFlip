@@ -208,7 +208,7 @@ export function buildTimetable(day: DayPlan, prefs: DayPrefs): TimeRow[] {
     meal("점심");
   }
   // 저녁까지 1시간 반 넘게 남으면: 숙소로 먼저 돌아가 쉬고, 저녁은 숙소 근처에서 먹는다
-  if (toMin("17:30") - (t + back) >= 90) {
+  if (toMin("17:30") - (t + back) >= 30) {
     goBack();
     rows.push({ time: toTime(t), end: "17:30", kind: "rest", title: "숙소 휴식", sub: "수영장·휴식 등 자유 시간" });
     t = toMin("17:30");
