@@ -5,8 +5,10 @@ import { BackButton } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { savePlan, useFlowQuery } from "@/lib/flow";
 import { fmtDate } from "@/services/itineraryV1";
-import { scoreRegions, tripDays } from "@/services/regionScore";
-import type { ChildBand, RegionQuery } from "@/services/regionScore";
+import { PILOT_TWIN_OF, scoreRegions, tripDays } from "@/services/regionScore";
+import type { ChildBand, RegionQuery, StayTier } from "@/services/regionScore";
+import { HOTELS } from "@/data/worldHotels";
+import type { HotelRow } from "@/data/worldHotels";
 import type { RegionV1 } from "@/data/regionsV1";
 
 // 연령대 → 검색 사이트에 넘길 대표 나이
@@ -18,9 +20,19 @@ function flightUrl(r: RegionV1, q: RegionQuery) {
   return `https://www.skyscanner.co.kr/transport/flights/icn/${r.airportCode}/${ymd(q.startDate)}/${ymd(q.endDate)}/?adultsv2=${q.adults}${kids ? `&childrenv2=${encodeURIComponent(kids)}` : ""}`;
 }
 
-function hotelUrl(r: RegionV1, q: RegionQuery) {
+/** §6 숙소 단계: 권역 안에서 가격 순 [0,30) 가성비 / [30,70) 가심비 / [70,90) 프리미엄 / [90,100] 하이엔드 */
+const TIER_RANGE: Record<StayTier, [number, number]> = { 가성비: [0, 0.3], 가심비: [0.3, 0.7], 프리미엄: [0.7, 0.9], 하이엔드: [0.9, 1.01] };
+function recommendHotels(regionId: string, tier: StayTier): HotelRow[] {
+  const all = HOTELS[PILOT_TWIN_OF[regionId] ?? regionId] ?? [];
+  const sorted = [...all].sort((a, b) => a[3] + a[4] - (b[3] + b[4]));
+  const [from, to] = TIER_RANGE[tier];
+  const pick = sorted.filter((_, i) => i / sorted.length >= from && i / sorted.length < to);
+  return pick.sort((a, b) => b[1] - a[1] || b[2] - a[2]).slice(0, 3); // 평점 높은 순, 같으면 리뷰 많은 순
+}
+
+function hotelUrl(r: RegionV1, q: RegionQuery, name?: string) {
   const p = new URLSearchParams({
-    textToSearch: r.searchName,
+    textToSearch: name ?? r.searchName,
     checkIn: q.startDate,
     checkOut: q.endDate,
     rooms: String(Math.ceil(q.adults / 2)),
@@ -41,6 +53,7 @@ export default function BookPage() {
   if (!r) return <main className="container page"><p className="muted">지역을 찾을 수 없어요.</p></main>;
   const days = tripDays(q.startDate, q.endDate);
   const people = q.adults + q.children.length;
+  const hotels = recommendHotels(id, q.stay);
 
   const save = () => {
     savePlan({ id: `${id}-${q.startDate}`, regionId: id, regionName: r.region.name, query: q, display: r.display, booked, createdAt: new Date().toISOString() });
@@ -64,6 +77,21 @@ export default function BookPage() {
         <section className={`book-card ${booked.hotel ? "done" : ""}`}>
           <div className="row"><Icon name="bed" size={22} /><b style={{ fontSize: 18 }}>숙소</b><span className="badge badge-muted">{q.stay}</span></div>
           <p className="small muted">{r.region.base} · 객실 {Math.ceil(q.adults / 2)}개 · {days - 1}박</p>
+          {hotels.length > 0 && (
+            <div className="stack" style={{ gap: 8 }}>
+              <span className="small bold">추천 숙소 ({q.stay})</span>
+              {hotels.map(([name, rating, reviews, lo, hi]) => (
+                <a key={name} className="card-soft between" href={hotelUrl(r.region, q, name)} target="_blank" rel="noopener noreferrer">
+                  <span>
+                    <b className="small">{name}</b>
+                    <span className="xs muted" style={{ display: "block" }}>★ {rating} · 리뷰 {reviews.toLocaleString()} · 1박 ${lo}~${hi}</span>
+                  </span>
+                  <Icon name="link" size={16} />
+                </a>
+              ))}
+              <span className="xs faint">평점 4.5↑·리뷰 300↑ 숙소 중에서 골랐어요. 가격은 트립어드바이저 기준 가격대(USD)라 실제 날짜 요금과 달라요.</span>
+            </div>
+          )}
           <a className="btn btn-teal btn-block" href={hotelUrl(r.region, q)} target="_blank" rel="noopener noreferrer">아고다에서 예약 <Icon name="link" /></a>
           <label className="check-row"><input type="checkbox" checked={booked.hotel} onChange={(e) => setBooked({ ...booked, hotel: e.target.checked })} />숙소 예약 완료</label>
         </section>

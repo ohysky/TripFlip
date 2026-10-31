@@ -6,7 +6,7 @@ import { WORLD_WEATHER, WORLD_WEATHER_SOURCE } from "@/data/worldWeather";
 import { COUNTRY_PRICE_LEVEL, FLIGHT_ESTIMATED, FLIGHT_KRW, FOOD_USD_US, HOTEL_ESTIMATED, HOTEL_MEDIAN_USD, KRW_PER_USD } from "@/data/worldPrices";
 
 // 시범 5개 권역은 날씨·도보 정보가 있는 regionsV1을 쓰고, 나머지는 전 세계 데이터(worldV1)를 붙인다.
-const PILOT_TWIN_OF: Record<string, string> = { OS: "jap-osaka", NT: "vie-nhatrang", HK: "hon-hongkong", DN: "vie-danang", PQ: "vie-phuquoc" };
+export const PILOT_TWIN_OF: Record<string, string> = { OS: "jap-osaka", NT: "vie-nhatrang", HK: "hon-hongkong", DN: "vie-danang", PQ: "vie-phuquoc" };
 const PILOT_TWINS = new Set(Object.values(PILOT_TWIN_OF));
 const TONES = ["#00ACB8", "#102F54", "#f2994a", "#2d9cdb", "#eb5757", "#27ae60", "#9b51e0"];
 export const ALL_REGIONS: RegionV1[] = [
